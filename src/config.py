@@ -210,6 +210,10 @@ class Settings:
     # Send the "let me check what we have" line the moment the search starts, rather than
     # leaving the customer with nothing until the trailers land.
     messenger_send_search_status: bool = True
+    # ---- Instagram DMs (src/api/instagram.py) ----
+    # Instagram messages come through the same Meta app as Messenger, so they use its app
+    # secret, verify token and page token; this only switches the Instagram webhook off.
+    instagram_enabled: bool = True
     # ---- the follow-up agent (src/followup) ----
     # Off by default, so a laptop pointed at the production database can never message a
     # customer; only the Azure job turns it on. The idle clock taught that lesson: a local
@@ -317,6 +321,7 @@ class Settings:
             messenger_chunk_pause_seconds=_float(_env("MESSENGER_CHUNK_PAUSE_SECONDS"), 0.8),
             messenger_typing_refresh_seconds=_float(_env("MESSENGER_TYPING_REFRESH_SECONDS"), 10.0),
             messenger_send_search_status=_bool(_env("MESSENGER_SEND_SEARCH_STATUS"), True),
+            instagram_enabled=_bool(_env("INSTAGRAM_ENABLED"), True),
             followup_enabled=_bool(_env("FOLLOWUP_ENABLED")),
             followup_first_after_hours=_float(_env("FOLLOWUP_FIRST_AFTER_HOURS"), 2.0),
             followup_second_after_hours=_float(_env("FOLLOWUP_SECOND_AFTER_HOURS"), 4.0),

@@ -111,6 +111,12 @@ from src.api.messenger import router as messenger_router  # noqa: E402
 
 app.include_router(messenger_router)
 
+# The Instagram DM webhook (src/api/instagram.py). Rides on the Messenger configuration - same
+# Meta app, secret and page token - and 404s whenever Messenger does or INSTAGRAM_ENABLED=0.
+from src.api.instagram import router as instagram_router  # noqa: E402
+
+app.include_router(instagram_router)
+
 
 def _env_float(name: str, default: float) -> float:
     try:

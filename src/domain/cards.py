@@ -34,6 +34,9 @@ CARD_TITLE_MAX = 80
 CARD_SUBTITLE_MAX = 80
 # The Send API's hard limit on one text bubble.
 MESSENGER_TEXT_LIMIT = 2000
+# Instagram's limit is 1,000 BYTES of UTF-8. Counted in characters with room to spare, for
+# the bullets, dashes and the odd emoji that take two or three bytes each.
+INSTAGRAM_TEXT_LIMIT = 900
 CARD_BUTTON_TITLE = "View Trailer"
 
 
@@ -140,16 +143,16 @@ def card_element(listing: Any, fallback_title: str = "", fallback_url: str = "")
     return element
 
 
-def split_for_messenger(text: str) -> list[str]:
+def split_for_messenger(text: str, limit: int = MESSENGER_TEXT_LIMIT) -> list[str]:
     """Keep every bubble inside the Send API's limit, splitting on line breaks."""
     body = str(text or "").strip()
-    if len(body) <= MESSENGER_TEXT_LIMIT:
+    if len(body) <= limit:
         return [body] if body else []
     parts: list[str] = []
     current = ""
     for line in body.split("\n"):
         candidate = f"{current}\n{line}" if current else line
-        if len(candidate) <= MESSENGER_TEXT_LIMIT:
+        if len(candidate) <= limit:
             current = candidate
             continue
         if current:
@@ -157,20 +160,22 @@ def split_for_messenger(text: str) -> list[str]:
             current = ""
         # One line over the limit is rare - no listing card is - so a hard slice is an
         # acceptable last resort rather than something worth a word wrapper.
-        while len(line) > MESSENGER_TEXT_LIMIT:
-            parts.append(line[:MESSENGER_TEXT_LIMIT])
-            line = line[MESSENGER_TEXT_LIMIT:]
+        while len(line) > limit:
+            parts.append(line[:limit])
+            line = line[limit:]
         current = line
     if current:
         parts.append(current)
     return parts
 
 
-def _sends_for_chunk(chunk: str, index: dict[str, Any], cards_enabled: bool) -> list[tuple[str, Any]]:
+def _sends_for_chunk(
+    chunk: str, index: dict[str, Any], cards_enabled: bool, limit: int = MESSENGER_TEXT_LIMIT
+) -> list[tuple[str, Any]]:
     """One bubble -> the sends it becomes: ``("text", str)`` or ``("card", element)``."""
     parsed = parse_listing_card(chunk)
     if not parsed:
-        return [("text", part) for part in split_for_messenger(chunk)]
+        return [("text", part) for part in split_for_messenger(chunk, limit)]
 
     marker, title, url, body = parsed
     listing = index.get(url_key(url)) if cards_enabled else None
@@ -183,19 +188,23 @@ def _sends_for_chunk(chunk: str, index: dict[str, Any], cards_enabled: bool) -> 
             ("text", url),
         ]
         if body:
-            bubbles.extend(("text", part) for part in split_for_messenger(body))
+            bubbles.extend(("text", part) for part in split_for_messenger(body, limit))
         return bubbles
 
     sends: list[tuple[str, Any]] = [("card", card_element(listing, title, url))]
     if body:
         # The bullets and the sales sentence - the part of the card Luna actually wrote.
         # The title and the price it copied are on the card above.
-        sends.extend(("text", part) for part in split_for_messenger(body))
+        sends.extend(("text", part) for part in split_for_messenger(body, limit))
     return sends
 
 
 def messenger_sends(
-    assistant_text: str, listings: Iterable[Any] | None, *, cards_enabled: bool = True
+    assistant_text: str,
+    listings: Iterable[Any] | None,
+    *,
+    cards_enabled: bool = True,
+    text_limit: int = MESSENGER_TEXT_LIMIT,
 ) -> list[tuple[str, Any]]:
     """The reply as the ordered sends Messenger needs, in the order to send them.
 
@@ -206,5 +215,24 @@ def messenger_sends(
     index = listings_by_url(listings)
     sends: list[tuple[str, Any]] = []
     for chunk in split_reply_into_chunks(assistant_text):
-        sends.extend(_sends_for_chunk(chunk, index, cards_enabled))
+        sends.extend(_sends_for_chunk(chunk, index, cards_enabled, text_limit))
     return sends
+
+
+def channel_sends(
+    channel: str, assistant_text: str, listings: Iterable[Any] | None
+) -> list[tuple[str, Any]]:
+    """The reply rendered for a push channel: ``messenger`` or ``instagram``.
+
+    Instagram gets no cards. Every trailer goes as its title, its link and its bullets in
+    plain bubbles, each inside Instagram's shorter limit.
+    """
+    from src.config import settings
+
+    if channel == "instagram":
+        return messenger_sends(
+            assistant_text, listings, cards_enabled=False, text_limit=INSTAGRAM_TEXT_LIMIT
+        )
+    return messenger_sends(
+        assistant_text, listings, cards_enabled=settings.messenger_listing_cards
+    )

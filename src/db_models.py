@@ -41,6 +41,9 @@ class ChatbotLead(Base):
         server_default=func.gen_random_uuid(),
     )
     psid: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Which platform ``psid`` belongs to - a Messenger PSID or an Instagram IGSID - or "web"
+    # when there is none. See src/channel_identity.py.
+    platform: Mapped[str] = mapped_column(String(16), nullable=False, default="messenger", server_default="messenger")
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     phone_number: Mapped[str | None] = mapped_column(String(64), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)

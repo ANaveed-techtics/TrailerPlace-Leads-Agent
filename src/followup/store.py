@@ -93,7 +93,13 @@ def find_candidates(now: datetime, *, ignore_timing: bool = False, lookback_hour
         rows = sql.execute(
             select(ChatbotConversation, ChatbotLead)
             .join(ChatbotLead, ChatbotLead.lead_id == ChatbotConversation.lead_id)
-            .where(ChatbotLead.psid.is_not(None), ChatbotConversation.updated_at > now - lookback)
+            # Messenger only. An Instagram customer is never followed up yet: the job sends
+            # through Messenger, and their psid holds an IGSID Messenger does not know.
+            .where(
+                ChatbotLead.psid.is_not(None),
+                ChatbotLead.platform == "messenger",
+                ChatbotConversation.updated_at > now - lookback,
+            )
         ).all()
         if not rows:
             return []

@@ -48,7 +48,8 @@ def _fire(timer: dict[str, Any], transport: Any) -> dict[str, Any]:
     session_id = timer["session_id"]
     psid = timer.get("channel_id")
     try:
-        if timer.get("channel") == "messenger" and psid and inbound.has_pending_inbound(psid):
+        channel = timer.get("channel")
+        if channel in inbound.PUSH_CHANNELS and psid and inbound.has_pending_inbound(psid, channel):
             # They wrote in; their own turn is on its way and answers them.
             conversation_store.finish_timer(session_id, "cancelled", "customer wrote in")
             return {"session_id": session_id, "status": "cancelled", "why": "customer wrote in"}
@@ -78,22 +79,24 @@ def _fire(timer: dict[str, Any], transport: Any) -> dict[str, Any]:
 
 
 def _deliver(timer: dict[str, Any], result: dict[str, Any], transport: Any) -> int | None:
-    """Messenger is pushed to. Web chat is not: the page polls /session/{id} and draws it."""
-    if timer.get("channel") != "messenger" or not timer.get("channel_id"):
+    """Messenger and Instagram are pushed to. Web chat is not: the page polls /session/{id}."""
+    channel = timer.get("channel")
+    if channel not in inbound.PUSH_CHANNELS or not timer.get("channel_id"):
         return None
     from src import channel_delivery
-    from src.config import settings
-    from src.domain.cards import messenger_sends
+    from src.domain.cards import channel_sends
 
     if transport is None:
-        from src.api.messenger import MessengerTransport, messenger_enabled
+        if channel == "instagram":
+            from src.api.instagram import InstagramTransport as transport_type
+            from src.api.instagram import instagram_enabled as enabled
+        else:
+            from src.api.messenger import MessengerTransport as transport_type
+            from src.api.messenger import messenger_enabled as enabled
 
-        if not messenger_enabled():
-            logger.warning("IDLE fired for Messenger, but Messenger is not configured: session=%s", timer["session_id"])
+        if not enabled():
+            logger.warning("IDLE fired for %s, but it is not configured: session=%s", channel, timer["session_id"])
             return 0
-        transport = MessengerTransport()
-    sends = messenger_sends(
-        result.get("assistant_text") or "", result.get("listings") or [],
-        cards_enabled=settings.messenger_listing_cards,
-    )
+        transport = transport_type()
+    sends = channel_sends(channel, result.get("assistant_text") or "", result.get("listings") or [])
     return channel_delivery.deliver(timer["channel_id"], sends, transport)

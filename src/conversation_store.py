@@ -19,7 +19,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from src import db
+from src import channel_identity, db
 from src.config import settings
 from src.db_models import ChatbotConversation, ChatbotIdleTimer, ChatbotLead, ChatbotOutbox, ChatbotTurn
 
@@ -106,7 +106,8 @@ def ensure_session(session_id: str, channel_id: str | None = None) -> str:
         # order is not merely tidy, it is required.
         lead = ChatbotLead(
             lead_id=uuid.uuid4(),
-            psid=(str(channel_id)[:255] if channel_id else None),
+            psid=(channel_identity.raw_id(channel_id)[:255] if channel_id else None),
+            platform=channel_identity.platform_of(channel_id) if channel_id else "web",
             name=None,
             phone_number=None,
             email=None,
@@ -158,7 +159,8 @@ def open_session(
 
         lead = ChatbotLead(
             lead_id=uuid.uuid4(),
-            psid=(str(channel_id)[:255] if channel_id else None),
+            psid=(channel_identity.raw_id(channel_id)[:255] if channel_id else None),
+            platform=channel_identity.platform_of(channel_id) if channel_id else "web",
             name=None,
             phone_number=None,
             email=None,
@@ -450,7 +452,8 @@ def save_turn(
             emailed=bool(outbox_events),
         )
         if channel_id and not record.get("psid"):
-            record["psid"] = str(channel_id)
+            record["psid"] = channel_identity.raw_id(channel_id)
+            record["platform"] = channel_identity.platform_of(channel_id)
         _MEMORY_TIMERS[session_id] = _timer_row(session_id, idle_timer)
         return
 
@@ -925,7 +928,8 @@ def _update_lead(
     # trip. A conversation that started before the column was written picks it up on its
     # next message.
     if channel_id and not lead.psid:
-        lead.psid = str(channel_id)[:255]
+        lead.psid = channel_identity.raw_id(channel_id)[:255]
+        lead.platform = channel_identity.platform_of(channel_id)
 
     # Only ever fill a blank. A later turn saying "actually I'm Dave's colleague" must not
     # silently overwrite the contact details the lead was qualified on.
@@ -963,6 +967,7 @@ def load_lead(session_id: str) -> dict[str, Any] | None:
             "contact_status": "complete" if complete
             else ("partial" if (name or email or phone) else "missing_contact"),
             "psid": record.get("psid"),
+            "platform": record.get("platform") or ("messenger" if record.get("psid") else "web"),
         }
 
     with db.get_session_factory()() as sql:
@@ -980,4 +985,5 @@ def load_lead(session_id: str) -> dict[str, Any] | None:
             "lead_type": lead.lead_type,
             "contact_status": lead.contact_status,
             "psid": lead.psid,
+            "platform": lead.platform,
         }

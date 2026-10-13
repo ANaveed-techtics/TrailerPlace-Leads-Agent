@@ -39,6 +39,8 @@ from src.db_models import ChatbotInboundMessage
 logger = logging.getLogger(__name__)
 
 DEFAULT_CHANNEL = "messenger"
+# The channels whose replies we push through Meta's Send API.
+PUSH_CHANNELS = ("messenger", "instagram")
 
 # How many times a reply may be thrown away because the customer carried on typing while
 # it was being written. After this the next answer goes out regardless - otherwise someone
@@ -432,13 +434,8 @@ def _keep_alive(turn_session: str, transport: Any, *, recipient_id: str | None =
 
 def _sends_for(channel: str, result: dict[str, Any]) -> list[tuple[str, Any]] | None:
     """The turn's reply, rendered for the channel that asked for it. None if it needs none."""
-    if channel != DEFAULT_CHANNEL:
+    if channel not in PUSH_CHANNELS:
         return None
-    from src.config import settings
-    from src.domain.cards import messenger_sends
+    from src.domain.cards import channel_sends
 
-    return messenger_sends(
-        result.get("assistant_text") or "",
-        result.get("listings") or [],
-        cards_enabled=settings.messenger_listing_cards,
-    )
+    return channel_sends(channel, result.get("assistant_text") or "", result.get("listings") or [])

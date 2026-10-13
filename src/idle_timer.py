@@ -26,7 +26,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from src import config
+from src import channel_identity, config
 
 # Python's own questions. Waiting on one of these is waiting on an answer too.
 _OPEN_CONFIRMATIONS = (
@@ -112,7 +112,7 @@ def plan(state: dict, channel_id: str | None, now: datetime | None = None) -> di
         return None
     now = now or datetime.now(timezone.utc)
     return {
-        "channel": "messenger" if channel_id else "web",
+        "channel": channel_identity.platform_of(channel_id) if channel_id else "web",
         "channel_id": str(channel_id) if channel_id else None,
         "category": str(category),
         "due_at": now + timedelta(minutes=float(config.settings.idle_results_minutes)),

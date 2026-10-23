@@ -86,9 +86,12 @@ app = FastAPI(title="TrailerPlace chatbot", version="1.0", lifespan=lifespan)
 # The question-rules admin API (src/api/admin_rules.py), for the control panel. Mounted only
 # when a token is configured, so a deploy without one has no admin surface at all.
 if settings.admin_api_token:
+    from src.api.admin_reports import router as admin_reports_router  # noqa: E402
     from src.api.admin_rules import router as admin_rules_router  # noqa: E402
 
     app.include_router(admin_rules_router)
+    # The chatbot leads report the accountability agent reads (src/api/admin_reports.py).
+    app.include_router(admin_reports_router)
 
 # The 5-minute rule's minute tick (src/api/idle.py). Mounted only with a token, like the admin
 # API: it messages customers, so a deploy without one exposes no such route at all.

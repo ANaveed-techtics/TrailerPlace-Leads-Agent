@@ -58,7 +58,12 @@ def qualified_state(**kwargs):
 # Raised from 15,600 for the ONLY LOCATION fact (~160 chars; 15,714 on 2026-09-25). Live, a
 # customer asked "Do you have a location in San Antonio?" and got the Wharton address and
 # hours without the answer: nothing said Wharton is the only one, so the bot never said no.
-MAX_SYSTEM_PROMPT_CHARS = 15_800
+#
+# Raised to 19,500 on 2026-11-20 when CI was added. The prompt had grown to 19,263 (no
+# database, catalogue from listings.xlsx) through the Rosenberg move, the grand-opening
+# announcement and the brand list; that version is live and working. The ceiling still
+# catches the next unplanned jump.
+MAX_SYSTEM_PROMPT_CHARS = 19_500
 
 
 def test_the_system_prompt_stays_short():

@@ -21,3 +21,6 @@ logs/
 
 # Customer chats pulled from the deployed bot - they hold real names, phones and emails
 deployed chat logs/
+
+# Local benchmark output
+benchmark_results/
